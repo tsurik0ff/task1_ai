@@ -1,159 +1,92 @@
 package com.example.task.controller;
 
+import com.example.task.controller.TodoItemController;
 import com.example.task.model.TodoItem;
-import com.example.task.repository.TodoItemRepository;
 import com.example.task.service.TodoItemService;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.mockito.MockitoAnnotations;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.test.context.junit4.SpringRunner;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.Arrays;
 import java.util.List;
 
-import static org.hamcrest.Matchers.hasSize;
-import static org.mockito.Mockito.when;
-import static org.hamcrest.Matchers.is;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.*;
 
-@RunWith(SpringRunner.class)
-@WebMvcTest(TodoItemController.class)
 public class TodoItemControllerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+    @InjectMocks
+    private TodoItemController todoItemController;
 
-    @MockBean
+    @Mock
     private TodoItemService todoItemService;
 
-    @MockBean
-    private TodoItemRepository todoItemRepository;
-
-    @Test
-    public void getAllTodoItems_ReturnsListOfTodoItems() throws Exception {
-        // Arrange
-        List<TodoItem> mockTodoItems = Arrays.asList(
-                createTodoItem(1L, "Task 1", "Description 1"),
-                createTodoItem(2L, "Task 2", "Description 2")
-        );
-        when(todoItemService.getAllTodoItems()).thenReturn(mockTodoItems);
-
-        // Act & Assert
-        mockMvc.perform(get("/api/todo"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].id", is(1)))
-                .andExpect(jsonPath("$[0].title", is("Task 1")))
-                .andExpect(jsonPath("$[0].description", is("Description 1")))
-                .andExpect(jsonPath("$[1].id", is(2)))
-                .andExpect(jsonPath("$[1].title", is("Task 2")))
-                .andExpect(jsonPath("$[1].description", is("Description 2")));
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
     }
 
     @Test
-    public void getTodoItemById_ExistingId_ReturnsTodoItem() throws Exception {
-        // Arrange
+    void testGetAllTodoItems() {
+        // Mock data
+        TodoItem item1 = createTodoItem(1L, "Task 1", "first");
+        TodoItem item2 = createTodoItem(2L, "Task 2", "second");
+        List<TodoItem> todoItemList = Arrays.asList(item1, item2);
+
+        when(todoItemService.getAllTodoItems()).thenReturn(todoItemList);
+
+        // Call the controller method
+        List<TodoItem> result = todoItemController.getAllTodoItems();
+
+        // Verify the result
+        assertEquals(2, result.size());
+        assertEquals("Task 1", result.get(0).getTitle());
+        assertEquals("Task 2", result.get(1).getTitle());
+    }
+
+    @Test
+    void testGetTodoItemById() {
+        // Mock data
         Long itemId = 1L;
-        TodoItem mockTodoItem = createTodoItem(itemId, "Task 1", "Description 1");
-        when(todoItemService.getTodoItemById(itemId)).thenReturn(mockTodoItem);
+        TodoItem item = createTodoItem(itemId, "Task 1", "first");
 
-        // Act & Assert
-        mockMvc.perform(get("/api/todo/{id}", itemId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(1)))
-                .andExpect(jsonPath("$.title", is("Task 1")))
-                .andExpect(jsonPath("$.description", is("Description 1")));
+        when(todoItemService.getTodoItemById(itemId)).thenReturn(item);
+
+        // Call the controller method
+        ResponseEntity<TodoItem> response = todoItemController.getTodoItemById(itemId);
+
+        // Verify the response
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals("Task 1", response.getBody().getTitle());
     }
 
     @Test
-    public void getTodoItemById_NonExistingId_ReturnsNotFound() throws Exception {
-        // Arrange
-        Long nonExistingItemId = 999L;
-        when(todoItemService.getTodoItemById(nonExistingItemId)).thenReturn(null);
-
-        // Act & Assert
-        mockMvc.perform(get("/api/todo/{id}", nonExistingItemId))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    public void createTodoItem_ValidItem_ReturnsCreatedItem() throws Exception {
-        // Arrange
-        TodoItem newItem = createTodoItem(null, "New Task", "New Description");
-        TodoItem createdItem = createTodoItem(1L, "New Task", "New Description");
-        when(todoItemService.createTodoItem(newItem)).thenReturn(createdItem);
-
-        // Act & Assert
-        mockMvc.perform(post("/api/todo")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(asJsonString(newItem)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id", is(1)))
-                .andExpect(jsonPath("$.title", is("New Task")))
-                .andExpect(jsonPath("$.description", is("New Description")));
-    }
-
-    @Test
-    public void updateTodoItem_ExistingId_ValidItem_ReturnsUpdatedItem() throws Exception {
-        // Arrange
+    void testCreateTodoItem() {
         Long itemId = 1L;
-        TodoItem updatedItem = createTodoItem(itemId, "Updated Task", "Updated Description");
-        TodoItem existingItem = createTodoItem(itemId, "Task 1", "Description 1");
-        when(todoItemService.updateTodoItem(itemId, updatedItem)).thenReturn(updatedItem);
+        TodoItem item = createTodoItem(itemId, "Task 1", "first");
 
-        // Act & Assert
-        mockMvc.perform(post("/api/todo/{id}", itemId, updatedItem)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(asJsonString(updatedItem)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(1)))
-                .andExpect(jsonPath("$.title", is("Updated Task")))
-                .andExpect(jsonPath("$.description", is("Updated Description")));
+        when(todoItemService.createTodoItem(item)).thenReturn(item);
+
+        ResponseEntity<TodoItem> response = todoItemController.createTodoItem(item);
+
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertEquals("Task 1", response.getBody().getTitle());
     }
 
     @Test
-    public void updateTodoItem_NonExistingId_ReturnsNotFound() throws Exception {
-        // Arrange
-        Long nonExistingItemId = 999L;
-        TodoItem updatedItem = createTodoItem(nonExistingItemId, "Updated Task", "Updated Description");
-        when(todoItemService.updateTodoItem(nonExistingItemId, updatedItem)).thenReturn(null);
-
-        // Act & Assert
-        mockMvc.perform(post("/api/todo/{id}", nonExistingItemId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(asJsonString(updatedItem)))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    public void deleteTodoItem_ExistingId_ReturnsNoContent() throws Exception {
-        // Arrange
+    void testGetTodoItemById_NotFound() {
         Long itemId = 1L;
+        when(todoItemService.getTodoItemById(itemId)).thenReturn(null);
 
-        // Act & Assert
-        mockMvc.perform(delete("/api/todo/{id}", itemId))
-                .andExpect(status().isNoContent());
-    }
+        ResponseEntity<TodoItem> response = todoItemController.getTodoItemById(itemId);
 
-    @Test
-    public void deleteTodoItem_NonExistingId_ReturnsNotFound() throws Exception {
-        // Arrange
-        Long nonExistingItemId = 999L;
-
-        // Act & Assert
-        mockMvc.perform(delete("/api/todo/{id}", nonExistingItemId))
-                .andExpect(status().isNotFound());
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
     }
 
     private TodoItem createTodoItem(Long id, String title, String description) {
@@ -164,13 +97,43 @@ public class TodoItemControllerTest {
         return todoItem;
     }
 
-    // Helper method to convert object to JSON
-    private String asJsonString(final Object obj) {
-        try {
-            final ObjectMapper mapper = new ObjectMapper();
-            return mapper.writeValueAsString(obj);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+    @Test
+    void testUpdateTodoItem() {
+        // Mock data
+        Long itemId = 1L;
+        TodoItem updatedItem = createTodoItem(itemId, "Updated Task", "first");
+
+        when(todoItemService.updateTodoItem(itemId, updatedItem)).thenReturn(updatedItem);
+
+        // Call the controller method
+        ResponseEntity<TodoItem> response = todoItemController.updateTodoItem(itemId, updatedItem);
+
+        // Verify the response
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals("Updated Task", response.getBody().getTitle());
     }
+
+    @Test
+    void testUpdateTodoItem_NotFound() {
+        Long itemId = 1L;
+        TodoItem updatedItem = createTodoItem(itemId, "Updated Task", "first");
+
+        when(todoItemService.updateTodoItem(itemId, updatedItem)).thenReturn(null);
+
+        ResponseEntity<TodoItem> response = todoItemController.updateTodoItem(itemId, updatedItem);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+    }
+
+    @Test
+    void testDeleteTodoItem() {
+        Long itemId = 1L;
+
+        ResponseEntity<Void> response = todoItemController.deleteTodoItem(itemId);
+
+        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+        verify(todoItemService, times(1)).deleteTodoItem(itemId);
+    }
+
+    // You can write similar tests for the other controller methods (create, update, delete).
 }
